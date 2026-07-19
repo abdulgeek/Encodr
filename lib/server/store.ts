@@ -153,8 +153,6 @@ export function startRun(jobId: string): RunRecord | null {
   };
   runs.set(record.id, record);
   job.latestRunId = record.id;
-  // TODO(candidate): you'll probably also want the job's status in listJobs()/getJob() to reflect
-  // its latest run (RUNNING / COMPLETED / FAILED). Decide where that derivation lives.
   return record;
 }
 

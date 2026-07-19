@@ -10,6 +10,10 @@ export const jobKeys = {
   detail: (id: string) => ["jobs", id] as const,
 };
 
+export const runKeys = {
+  detail: (id: string) => ["runs", id] as const,
+};
+
 // Two worked examples to show the intended React Query pattern:
 export function useJobs() {
   return useQuery({
@@ -36,12 +40,22 @@ export function useCreateJob() {
   });
 }
 
-// TODO(candidate): a mutation to start a run (POST /api/runs → { runId }).
-//
-// TODO(candidate): a helper to fetch a single run (GET /api/runs/:id) — useful for reading the
-// result once the stream reports COMPLETED.
+/** Start a run for a job. Returns { runId }; the detail page swaps that into local state. */
+export function useStartRun() {
+  return useMutation({
+    mutationFn: (jobId: string) => api.post<{ runId: string }>("/api/runs", { jobId }),
+  });
+}
 
-/** Imperative one-shot fetch of a run's current state. */
-export function fetchRun(runId: string) {
-  return api.get<EncodeRun>(`/api/runs/${runId}`);
+/**
+ * The run's current server state. Enabled only once there's a runId. The stream drives live UI;
+ * this is how the *result* (renditions/duration/warnings) is read once the stream reports terminal —
+ * onTerminal invalidates this key so it refetches the completed run.
+ */
+export function useRun(runId: string | null) {
+  return useQuery({
+    queryKey: runKeys.detail(runId ?? ""),
+    queryFn: ({ signal }) => api.get<EncodeRun>(`/api/runs/${runId}`, signal),
+    enabled: !!runId,
+  });
 }
