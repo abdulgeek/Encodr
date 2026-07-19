@@ -75,9 +75,10 @@ let refreshInFlight: Promise<boolean> | null = null;
  * Swap the stored refresh token for a fresh access token, storing it on success and resolving true.
  * Concurrent callers share the one in-flight promise; it's reset in a finally so the next 401 wave
  * starts a new one. Deliberately a plain fetch (not request()) so a 401 from the refresh endpoint
- * can't recurse back into this same refresh-and-retry path.
+ * can't recurse back into this same refresh-and-retry path. Exported so the SSE reconnect can reuse
+ * the same shared refresh before reopening its stream.
  */
-function refreshAccessToken(): Promise<boolean> {
+export function refreshAccessToken(): Promise<boolean> {
   if (refreshInFlight) return refreshInFlight;
 
   const p = (async (): Promise<boolean> => {

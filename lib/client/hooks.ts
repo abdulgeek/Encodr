@@ -29,12 +29,46 @@ export function useJob(id: string) {
   });
 }
 
-/** Create a job, then invalidate the list so it refetches with the new row. */
+/** Prefix marking a not-yet-persisted job in the cache — the list keeps these rows non-clickable. */
+export const TEMP_JOB_PREFIX = "tmp_";
+
+/** Mirror the server's filename-fallback title so the optimistic row reads the same as the real one. */
+function deriveTitleFromUrl(sourceUrl: string): string {
+  try {
+    const path = new URL(sourceUrl).pathname.replace(/\/+$/, "");
+    const last = path.split("/").filter(Boolean).pop();
+    return last ? decodeURIComponent(last) : "Untitled encode";
+  } catch {
+    return "Untitled encode";
+  }
+}
+
+/**
+ * Create a job, optimistically. onMutate writes a temporary row into the cache so the list updates
+ * instantly; onError rolls the snapshot back; onSettled invalidates so the real server row (with its
+ * real id) replaces the temp one either way.
+ */
 export function useCreateJob() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: CreateJobInput) => api.post<Job>("/api/jobs", input),
-    onSuccess: () => {
+    onMutate: async (input: CreateJobInput) => {
+      await queryClient.cancelQueries({ queryKey: jobKeys.all });
+      const previous = queryClient.getQueryData<Job[]>(jobKeys.all);
+      const optimistic: Job = {
+        id: `${TEMP_JOB_PREFIX}${Math.random().toString(36).slice(2, 10)}`,
+        title: input.title?.trim() || deriveTitleFromUrl(input.sourceUrl),
+        sourceUrl: input.sourceUrl.trim(),
+        status: "NEW",
+        createdAt: new Date().toISOString(),
+      };
+      queryClient.setQueryData<Job[]>(jobKeys.all, (old) => [optimistic, ...(old ?? [])]);
+      return { previous };
+    },
+    onError: (_err, _input, context) => {
+      if (context?.previous) queryClient.setQueryData(jobKeys.all, context.previous);
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: jobKeys.all });
     },
   });

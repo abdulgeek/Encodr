@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createJobSchema, type CreateJobInput } from "@/lib/schemas";
 import { ApiError } from "@/lib/client/api";
-import { useCreateJob, useJobs } from "@/lib/client/hooks";
+import { TEMP_JOB_PREFIX, useCreateJob, useJobs } from "@/lib/client/hooks";
 import { StatusBadge } from "@/components/status-badge";
 
 function formatCreatedAt(iso: string): string {
@@ -121,12 +121,12 @@ export default function JobsPage() {
 
         {jobs.data && jobs.data.length > 0 && (
           <ul className="divide-y divide-neutral-200 rounded-md border border-neutral-200">
-            {jobs.data.map((job) => (
-              <li key={job.id}>
-                <Link
-                  href={`/jobs/${job.id}`}
-                  className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-neutral-50"
-                >
+            {jobs.data.map((job) => {
+              // An optimistic row: it has no real id yet, so don't let anyone navigate to it.
+              const pending = job.id.startsWith(TEMP_JOB_PREFIX);
+              const rowClass = "flex items-center justify-between gap-3 px-4 py-3";
+              const inner = (
+                <>
                   <div className="min-w-0">
                     <p className="truncate font-medium">{job.title}</p>
                     <p className="truncate text-xs text-neutral-500">{job.sourceUrl}</p>
@@ -134,12 +134,25 @@ export default function JobsPage() {
                   <div className="flex shrink-0 flex-col items-end gap-1">
                     <StatusBadge value={job.status} />
                     <span className="text-xs text-neutral-400">
-                      {formatCreatedAt(job.createdAt)}
+                      {pending ? "Creating…" : formatCreatedAt(job.createdAt)}
                     </span>
                   </div>
-                </Link>
-              </li>
-            ))}
+                </>
+              );
+              return (
+                <li key={job.id}>
+                  {pending ? (
+                    <div className={`${rowClass} opacity-60`} aria-disabled="true">
+                      {inner}
+                    </div>
+                  ) : (
+                    <Link href={`/jobs/${job.id}`} className={`${rowClass} hover:bg-neutral-50`}>
+                      {inner}
+                    </Link>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>
